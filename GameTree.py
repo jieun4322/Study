@@ -20,8 +20,94 @@ class Player(ABC): # extends ABC(Abstract Base Class) to become an abstract clas
 
     @abstractmethod
     def doOthersTurn(self, color, number): pass
+    
+class PTreePlayer(Player):
+    def __init__(self, numBlack, numWhite, player): 
+        # [0] currentPlayer, [1] numCoins(B, W), [2] numWins(Player0, Player1), [3] childList, [4] parent
+        self.root = (0, [numBlack, numWhite], [0, 0], [None, None, None, None], None)
+        self.player = player
+        self.maxNumSimulations = 50
+        self.CONST_C = math.sqrt(2)
+        self.expandTree()
+    
+    def expandTree(self):
+        while (self.root[2][0]+self.root[2][1]) < self.maxNumSimulations:
+            node = self.root
+            temp = 0
+            maxChild = None
+            bw = 0
 
+            while True:
+                if sum(node[1]) == 0:
+                    return
+                for i in range(4):
+                    if node[3][i] is None: # Child not yet created
+                        if sum(node[1]) == 0: # No coins left to create a new node
+                            continue
+                        else: # Create a new node
+                            if temp < 100000:
+                                temp = 100000
+                                maxChild = (self.player, [0, 0], [0, 0], [None, None, None, None], node)
+                                node[3][i] = maxChild
+                                bw = i   
+                    else:
+                        child = node[3][i]
+                        total_simulations = sum(child[2])
+                        if total_simulations == 0:
+                            uct_value = float('inf')  # Prioritize unexplored nodes
+                        else:
+                            uct_value = (child[2][self.player] / sum(child[2]) + 
+                                     self.CONST_C * math.sqrt(math.log(sum(node[2]) + 1) / (sum(child[2]) + 1)))
+                        if temp < uct_value:
+                            maxChild = child
+                            temp = uct_value
+                            bw = i
 
+                if temp == 100000:                                   
+                    if bw == 0:
+                        maxChild[1][0] = node[1][0] - 2 
+                        maxChild[1][1] = node[1][1]
+                    elif bw == 1:
+                        maxChild[1][0] = node[1][0] - 1 
+                        maxChild[1][1] = node[1][1]
+                    elif bw == 2:
+                        maxChild[1][0] = node[1][0]
+                        maxChild[1][1] = node[1][1] - 2
+                    elif bw == 3:
+                        maxChild[1][0] = node[1][0]
+                        maxChild[1][1] = node[1][1] - 1
+                    break
+                else:
+                    node = maxChild
+
+                if maxChild is None: # No valid child found
+                    break
+            if maxChild is None:
+                continue
+
+            player_num = self.player  # Current player
+            stone_num = maxChild[1].copy()  # Copy of stone numbers for simulation
+
+            # Random simulation
+            while stone_num[0] > 0 or stone_num[1] > 0:
+                if stone_num[0] == 0:
+                    stone_num[1] = max(0, stone_num[1] - 1)
+                elif stone_num[1] == 0:
+                    stone_num[0] = max(0, stone_num[0] - 1)
+                else:
+                    if random.randint(1, 2) == 1:
+                        stone_num[0] = max(0, stone_num[0] - 1)
+                    else:
+                        stone_num[1] = max(0, stone_num[1] - 1)
+                player_num = 1 - player_num
+
+            # Update win statistics
+            while maxChild is not None:
+                maxChild[2][player_num] += 1
+                maxChild = maxChild[4]
+    pass
+
+    """
 class PTreePlayer(Player):
     def __init__(self, numBlack, numWhite, player): 
         # [0] currentPlayer, [1] numCoins(B, W), [2] numWins(Player0, Player1), [3] childList, [4] parent
@@ -33,75 +119,108 @@ class PTreePlayer(Player):
     
     def expandTree(self):
         temp = 0
-        w, s = 0
-        # 임시 저장 노드 temp 
+
         while sum(self.root[2]) < self.maxNumSimulations:
-            node = self.root
+            node = self.root #self.root에서 시작해  추가할 노드 탐색 시작
             temp = 0
-            maxChild = 0
+            maxChild = None
             check = 1
+            bw = 0
+
             while True:
-                if(sum(node[1]) == 0):
+                if sum(node[1]) == 0:
                     return
-                for i in range(0,3):
-                    if(node[3][i] == None): # 진짜 없거나, 있는데 추가 안 했거나 -> 판별해야 함
-                        #랜덤 시뮬레이션
-                        if (node[3][i] == "진짜 없음"):
+                for i in range(4):
+                    if node[3][i] is None: # 진짜 없거나, 있는데 추가 안 했거나 -> 판별해야 함
+                        if sum(node[1]) == 0: #진짜 없음
                             continue
-                        else:
+                        else: #있는데 추가 안함
                             if(temp < 100000):
-                                temp = 100000
-                                maxChild = node[3][i]
-                    elif(temp < "자식노드wi / 자식노드si + node.CONST_C * math.sqrt(math.log(sp:내노드si)/자식노드si)"):
-                        maxChild = node[3][i]
-                        temp = "자식노드wi / 자식노드si + node.CONST_C * math.sqrt(math.log(sp:내노드si)/자식노드si)"
-                        #랜덤 시뮬레이션
-                    
-                if(maxChild == None):
-                    "노드추가하고 break"
-                    c = 0
+                                temp = 100000 #s = 0
+                                maxChild = (self.player, [0, 0], [0, 0], [None, None, None, None], node[4])
+                                node[3][i] = maxChild
+                                bw = i   
+                                
+                    # ▽ 자식 4개 중 가장 큰 노드 node = maxChild 
+                    elif node[3][i] is not None:
+                        child = node[3][i]
+                        uct_value = float('inf')
+                        uct_value = (child[2][self.player] / sum(child[2]) + 
+                                     self.CONST_C * math.sqrt(math.log(sum(node[2]) + 1) / (sum(child[2]) + 1)))
+                        if temp < uct_value:
+                            maxChild = child
+                            temp = uct_value
+                            bw = i
+
+                            
+                #node추가 안되어있으면 추가, 있으면 node=child
+                if(temp == 10000):                                   
+                    # [0]:검2 [1]:검1 [2]:흰2 [3]:흰1
+                    if bw == 0:
+                            maxChild[1][0] = node[1][0] - 2 
+                            maxChild[1][1] = node[1][1]    
+                    if bw == 1:
+                            maxChild[1][0] = node[1][0] - 1 
+                            maxChild[1][1] = node[1][1]   
+                    if bw == 2 :
+                            maxChild[1][0] = node[1][0]
+                            maxChild[1][1] = node[1][1] - 2
+                    if bw == 3:
+                            maxChild[1][0] = node[1][0]
+                            maxChild[1][1] = node[1][1] - 1    
                     break
                 else:
-                    node = maxChild    
-            if (maxChild == 0):
-                break
-            
-            if (check == 1):
-                break
-            
-            player_num = maxChild[0] # player number
-            stone_num = maxChild[1].copy() # stone number
-            
-            # C
-            while (stone_num[0] > 0 or stone_num[1] > 0):
-                random1 = random.randint(1, 2)
-                if (stone_num[0] == 0):
-                    stone_num[1] = max(0, stone_num[1] - temp)
-                elif (stone_num[1] == 0):
-                    stone_num[0] = max(0, stone_num[0] - temp)
-                else:
-                    random2 = random.randint(1, 2)
-                    if (random1 == 1):
+                    node = maxChild  
+                    
+                ################################    
+                if (maxChild is None): #node의 자식을 search했는데 앖음
+                    break
+                if (check == 1):
+                    break
+                ################################
+                
+                player_num = self.player # Current player
+                stone_num = maxChild[1].copy() # stone number
+                
+                # 랜덤 시뮬레이션
+                while stone_num[0] > 0 or stone_num[1] > 0:
+                    if stone_num[0] == 0:
+                        stone_num[1] = max(0, stone_num[1] - 1)
+                    elif stone_num[1] == 0:
+                        stone_num[0] = max(0, stone_num[0] - 1)
+                    else:
+                        if random.randint(1, 2) == 1:
+                            stone_num[0] = max(0, stone_num[0] - 1)
+                        else:
+                            stone_num[1] = max(0, stone_num[1] - 1)                
+
+
+
+                ####################################################
+                while (stone_num[0] > 0 or stone_num[1] > 0):
+                    random1 = random.randint(1, 2)
+                    if (stone_num[0] == 0):
+                        stone_num[1] = max(0, stone_num[1] - temp)
+                    elif (stone_num[1] == 0):
                         stone_num[0] = max(0, stone_num[0] - temp)
                     else:
-                        stone_num[1] = max(0, stone_num[1] - temp)
-                if (player_num == 0):
-                    player_num = 1
-                else:
-                    player_num = 0
-            
-            # D part
-            while (maxChild is not None):
-                maxChild[2] = 
-            
-            
-            
-            
-            a = maxChild            
-            while(a[1] == (0,0)):
-                #임의로 랜덤한 수 선택하여 진행해서 승자 확인
+                        random2 = random.randint(1, 2)
+                        if (random1 == 1):
+                            stone_num[0] = max(0, stone_num[0] - temp)
+                        else:
+                            stone_num[1] = max(0, stone_num[1] - temp)
+                    if (player_num == 0):
+                        player_num = 1
+                    else:
+                        player_num = 0
+                ####################################################
+                
+                # D part : wi, si 업데이트
+                while maxChild is not None:
+                    maxChild[2][player_num] += 1
+                    maxChild = maxChild[4]
         pass
-
+    """
 
     def __str__(self): # called when this instance is printed - return nodes' info in BFS order
         result = [f"A total of {sum(self.root[2]) + 1} nodes"]
@@ -279,7 +398,7 @@ if __name__ == "__main__":
     print(f"Average running time is {tGame:.10f} for inputs ({numBlack}, {numWhite}, {PlayerClass0.__name__}, {PlayerClass1.__name__})")'''
 
     # Test for after-class problems
-    '''print()
+    print()
     print("Correctness test for PTreePlayer")
     print(" if your answer does not appear within 5 seconds, consider that you failed the case")
     correct = True
@@ -359,5 +478,5 @@ if __name__ == "__main__":
         print(f"Average running times of the submitted code {tSubmittedCode:.10f} and TreePlayer {tSpeedCompare1:.10f}")        
         if tSubmittedCode * 4 < tSpeedCompare1: print("pass")
         else: print("fail")
-        print()'''
+        print()
         
